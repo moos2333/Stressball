@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "LDL",
+    "DSD",
+    "LDL"
+  ],
+  "key": {
+    "L": {
+      "item": "minecraft:lapis_block",
+      "data": 0
+    },
+    "D": {
+      "item": "minecraft:diamond_block"
+    },
+    "S": {
+      "item": "stressball:stressball"
+    }
+  },
+  "result": {
+    "item": "stressball:pressure_ball",
+    "count": 1
+  }
+}

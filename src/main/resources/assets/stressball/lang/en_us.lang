@@ -1,1 +1,4 @@
 item.stressball.stressball.name=Stress Ball
+item.stressball.pressure_ball.name=Pressure Ball
+stressball.tooltip.stressball=Automatically attacks when standing still\nCannot attack while inventory is open
+stressball.tooltip.pressure_ball=Automatically attacks when standing still\nCertain items are used with right-click instead

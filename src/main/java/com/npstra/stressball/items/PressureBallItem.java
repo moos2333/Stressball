@@ -5,12 +5,12 @@ import baubles.api.BaublesApi;
 import baubles.api.IBauble;
 import baubles.api.cap.IBaublesItemHandler;
 import com.npstra.stressball.StressBall;
-import com.npstra.stressball.capability.GuiStateCapability;
-import com.npstra.stressball.capability.IGuiState;
 import com.npstra.stressball.config.ConfigHandler;
+import net.minecraft.client.resources.I18n;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityList;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -21,7 +21,9 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextFormatting;
@@ -40,28 +42,30 @@ import java.util.UUID;
 import java.util.WeakHashMap;
 
 @Mod.EventBusSubscriber
-public class StressBallItem extends Item implements IBauble {
-    @GameRegistry.ObjectHolder(StressBall.MODID + ":stressball")
-    public static final StressBallItem STRESS_BALL = null;
+public class PressureBallItem extends Item implements IBauble {
+    @GameRegistry.ObjectHolder(StressBall.MODID + ":pressure_ball")
+    public static final PressureBallItem PRESSURE_BALL = null;
 
     private static final double ATTACK_RANGE = 3.0;
+    private static final int ATTACK_INTERVAL = 10;
+    private static final int MOVEMENT_COOLDOWN = 10;
     private static final double MOVEMENT_THRESHOLD = 0.001;
-    private static final int STAND_DELAY = 2;
 
-    private static final Map<UUID, Vec3d> LAST_POSITION = new WeakHashMap<>();
-    private static final Map<UUID, Integer> STAND_TIMER = new WeakHashMap<>();
+    private static final Map<UUID, Integer> LAST_ATTACK_TIME = new WeakHashMap<>();
+    private static final Map<UUID, BlockPos> LAST_POSITION = new WeakHashMap<>();
+    private static final Map<UUID, Integer> MOVEMENT_TIMER = new WeakHashMap<>();
 
-    public StressBallItem() {
+    public PressureBallItem() {
         setMaxStackSize(1);
         setCreativeTab(CreativeTabs.TOOLS);
-        setTranslationKey(StressBall.MODID + ".stressball");
-        setRegistryName("stressball");
+        setTranslationKey(StressBall.MODID + ".pressure_ball");
+        setRegistryName("pressure_ball");
     }
 
     @Override
     @SideOnly(Side.CLIENT)
     public void addInformation(ItemStack stack, @Nullable World world, List<String> tooltip, ITooltipFlag flag) {
-        String full = net.minecraft.client.resources.I18n.format(StressBall.MODID + ".tooltip.stressball");
+        String full = I18n.format(StressBall.MODID + ".tooltip.pressure_ball");
         for (String line : full.split("\\\\n")) {
             tooltip.add(TextFormatting.GRAY + line);
         }
@@ -69,7 +73,7 @@ public class StressBallItem extends Item implements IBauble {
 
     @SubscribeEvent
     public static void registerItems(RegistryEvent.Register<Item> event) {
-        event.getRegistry().register(new StressBallItem());
+        event.getRegistry().register(new PressureBallItem());
     }
 
     @Override
@@ -84,39 +88,41 @@ public class StressBallItem extends Item implements IBauble {
         EntityPlayer entityPlayer = (EntityPlayer) player;
         UUID uuid = entityPlayer.getUniqueID();
 
-        Vec3d currentPos = entityPlayer.getPositionVector();
-        Vec3d lastPos = LAST_POSITION.get(uuid);
-        boolean moved = false;
+        BlockPos currentPos = entityPlayer.getPosition();
+        BlockPos lastPos = LAST_POSITION.get(uuid);
         if (lastPos != null) {
-            double dx = currentPos.x - lastPos.x;
-            double dy = currentPos.y - lastPos.y;
-            double dz = currentPos.z - lastPos.z;
+            double dx = currentPos.getX() - lastPos.getX();
+            double dy = currentPos.getY() - lastPos.getY();
+            double dz = currentPos.getZ() - lastPos.getZ();
             if (dx * dx + dy * dy + dz * dz > MOVEMENT_THRESHOLD) {
-                moved = true;
+                MOVEMENT_TIMER.put(uuid, MOVEMENT_COOLDOWN);
             }
         }
         LAST_POSITION.put(uuid, currentPos);
 
-        IGuiState guiState = GuiStateCapability.get(entityPlayer);
-        boolean guiOpen = guiState != null && guiState.isGuiOpen();
-
-        if (moved || guiOpen) {
-            STAND_TIMER.put(uuid, 0);
-            return;
-        }
-
-        int timer = STAND_TIMER.getOrDefault(uuid, 0);
-        if (timer < STAND_DELAY) {
-            STAND_TIMER.put(uuid, timer + 1);
-            return;
+        Integer timer = MOVEMENT_TIMER.get(uuid);
+        if (timer != null) {
+            if (timer > 0) {
+                MOVEMENT_TIMER.put(uuid, timer - 1);
+                return;
+            } else {
+                MOVEMENT_TIMER.remove(uuid);
+            }
         }
 
         if (shouldAttack(entityPlayer) && entityPlayer.getCooledAttackStrength(0.5F) >= 1.0F) {
-            int lastTick = StressBall.LAST_ATTACK_TICK.getOrDefault(uuid, 0);
+            int lastTick = LAST_ATTACK_TIME.getOrDefault(uuid, 0);
             int currentTick = entityPlayer.ticksExisted;
-            if (currentTick - lastTick >= 10) {
-                performAutoAttack(entityPlayer);
-                StressBall.LAST_ATTACK_TICK.put(uuid, currentTick);
+            if (currentTick - lastTick >= ATTACK_INTERVAL) {
+                ItemStack mainhand = entityPlayer.getHeldItemMainhand();
+                String regName = mainhand.isEmpty() ? "" : mainhand.getItem().getRegistryName().toString();
+
+                if (!mainhand.isEmpty() && ConfigHandler.isRightClickItem(regName)) {
+                    processRightClickAttack(entityPlayer);
+                } else {
+                    performAutoAttack(entityPlayer);
+                }
+                LAST_ATTACK_TIME.put(uuid, currentTick);
             }
         }
     }
@@ -132,6 +138,13 @@ public class StressBallItem extends Item implements IBauble {
         if (!player.onGround) return false;
 
         return true;
+    }
+
+    private void processRightClickAttack(EntityPlayer player) {
+        ItemStack mainhand = player.getHeldItemMainhand();
+        if (mainhand.isEmpty()) return;
+
+        mainhand.getItem().onItemRightClick(player.world, player, EnumHand.MAIN_HAND);
     }
 
     private void performAutoAttack(EntityPlayer player) {
@@ -158,6 +171,9 @@ public class StressBallItem extends Item implements IBauble {
         }
 
         if (targetEntity != null) {
+            ResourceLocation entityId = EntityList.getKey(targetEntity.getClass());
+            if (entityId != null && ConfigHandler.isEntityBlacklisted(entityId.toString())) return;
+
             player.attackTargetEntityWithCurrentItem(targetEntity);
             return;
         }
@@ -196,9 +212,9 @@ public class StressBallItem extends Item implements IBauble {
     public void onUnequipped(ItemStack itemstack, EntityLivingBase player) {
         player.playSound(SoundEvents.ITEM_ARMOR_EQUIP_DIAMOND, 0.75F, 2.0F);
         UUID uuid = player.getUniqueID();
-        StressBall.LAST_ATTACK_TICK.remove(uuid);
+        LAST_ATTACK_TIME.remove(uuid);
         LAST_POSITION.remove(uuid);
-        STAND_TIMER.remove(uuid);
+        MOVEMENT_TIMER.remove(uuid);
     }
 
     @Override

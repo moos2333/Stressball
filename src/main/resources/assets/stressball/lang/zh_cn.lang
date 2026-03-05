@@ -1,1 +1,4 @@
 item.stressball.stressball.name=解压球
+item.stressball.pressure_ball.name=压力球
+stressball.tooltip.stressball=站立不动时自动攻击\n物品栏打开时无效
+stressball.tooltip.pressure_ball=站立不动时自动攻击\n特定物品将变为右键使用

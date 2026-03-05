@@ -1,6 +1,6 @@
 {
   "parent": "item/generated",
   "textures": {
-    "layer0": "stressball:items/stress_ball"
+    "layer0": "stressball:items/pressure_ball"
   }
 }
