@@ -58,7 +58,7 @@ public class ConfigHandler {
         };
         defaultData.rightClickItems = new String[]{
                 "tconstruct:shuriken",
-                "tconevo:tool_spectre",
+                "tconevo:tool_sceptre",
                 "plustic:laser_gun"
         };
         try (FileWriter writer = new FileWriter(configFile)) {
