@@ -1,21 +1,59 @@
-## TemplateDevEnv
-_For Kotlin see [TemplateDevEnvKt](https://github.com/CleanroomMC/TemplateDevEnvKt)_
+**Stress Ball - Auto-Attack Baubles**
 
-Template workspace for modding Minecraft 1.12.2. Licensed under MIT, it is made for public use.
+This mod adds two new baubles inspired by Terraria: the **Stress Ball** and its upgraded version, the **Pressure Ball**. Both items require the **Baubles** mod as a dependency and are designed for Minecraft 1.12.2.
 
-This template runs on **Java 25**, **Gradle 9.2.1** + **[RetroFuturaGradle](https://github.com/GTNewHorizons/RetroFuturaGradle) 2.0.2** + **Forge 14.23.5.2847**.
+## Features
 
-With **coremod and mixin support** that is easy to configure.
+### Stress Ball
+- Automatically performs a left-click attack every 0.5 seconds when the player stands still and has no GUI open (e.g., inventory, chests, crafting tables).
+- Attack respects the weapon's attack speed: if the weapon's cooldown is longer than 0.5 seconds, attacks occur at the weapon's natural rate; if shorter, a 0.5‑second minimum interval prevents exceeding the invincibility frame limit.
+- Attack range is fixed at 3 blocks (same as default player reach).
+- Configurable item blacklist: if the player holds a blacklisted item in the main hand, no automatic attacks occur.
 
-### Instructions:
+### Pressure Ball
+- An upgraded version of the Stress Ball.
+- Also attacks automatically when standing still, but **without any GUI restriction** and includes a brief cooldown after moving.
+- In addition to the standard left-click attack, it can be configured to **trigger right‑click actions** for specific items (e.g., Tinkers' Construct shurikens, TConEvo spectres, PlusTIC laser guns).
+- Features a configurable **entity blacklist** (e.g., item frames, paintings, armor stands) to prevent accidental attacks.
+- Inherits the same attack range, cooldown mechanics, and item blacklist as the Stress Ball.
 
-1. Click `use this template` at the top.
-2. Clone the repository that you have created with this template to your local machine.
-3. Make sure IDEA is using Java 25 for Gradle before you sync the project. Verify this by going to IDEA's `Settings > Build, Execution, Deployment > Build Tools > Gradle > Gradle JVM`.
-4. Open the project folder in IDEA. When prompted, click "Load Gradle Project" as it detects the `build.gradle`, if you weren't prompted, right-click the project's `build.gradle` in IDEA, select `Link Gradle Project`, after completion, hit `Refresh All` in the gradle tab on the right.
-5. Run gradle tasks such as `runClient` and `runServer` in the IDEA gradle tab, or use the auto-imported run configurations like `1. Run Client`.
+## Crafting Recipes
 
-### Notes:
-- Dependencies script in [gradle/scripts/dependencies.gradle](gradle/scripts/dependencies.gradle), explanations are commented in the file.
-- Publishing script in [gradle/scripts/publishing.gradle](gradle/scripts/publishing.gradle).
-- When writing Mixins on IntelliJ, it is advisable to use latest [MinecraftDev Fork for RetroFuturaGradle](https://github.com/eigenraven/MinecraftDev/releases).
+### Stress Ball
+- **Pattern**:
+    - Iron blocks (I) in the corners
+    - Redstone blocks (R) in cardinal directions
+    - Gold block (G) in the center
+- **Result**: 1 Stress Ball
+
+### Pressure Ball
+- **Pattern**:
+    - Lapis lazuli blocks (L) in the corners
+    - Diamond blocks (D) in cardinal directions
+    - Stress Ball (S) in the center
+- **Result**: 1 Pressure Ball
+
+All recipes are shapeless and can be viewed in-game with JEI.
+
+## Configuration
+
+A JSON configuration file is generated at `config/stressball.json` after the first run. You can edit it to customize:
+
+```json
+{
+  "itemBlacklist": ["cyclicmagic:storage_bag"],
+  "entityBlacklist": ["minecraft:item_frame", "minecraft:painting", "minecraft:armor_stand", "minecraft:item"],
+  "rightClickItems": ["tconstruct:shuriken", "tconevo:tool_spectre", "plustic:laser_gun"]
+}
+```  
+
+- **itemBlacklist**: Items in this list will **not** trigger automatic attacks when held.
+- **entityBlacklist**: Entities in this list will **not** be attacked.
+- **rightClickItems** (Pressure Ball only): When holding any item from this list, the Pressure Ball will trigger its **right‑click** action instead of a left‑click attack.
+
+## Notes
+- This mod was created with the assistance of AI.
+- Requires Minecraft 1.12.2, Forge, and Baubles.
+
+## Credits
+Inspired by the Stress Ball item from Terraria.
