@@ -130,7 +130,8 @@ public class StressBallItem extends Item implements IBauble {
 
         if (player.moveForward != 0 || player.moveStrafing != 0) return false;
         if (!player.onGround) return false;
-
+        if (player.isHandActive()) return false;
+        if (player.isPlayerSleeping()) return false;
         return true;
     }
 
