@@ -13,7 +13,6 @@ import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.item.EnumRarity;
 import net.minecraft.item.Item;
@@ -165,10 +164,7 @@ public class StressBallItem extends Item implements IBauble {
 
         RayTraceResult blockResult = player.world.rayTraceBlocks(eyePos, endPos, false, true, true);
         if (blockResult != null && blockResult.typeOfHit == RayTraceResult.Type.BLOCK) {
-            if (player instanceof EntityPlayerMP) {
-                EntityPlayerMP mp = (EntityPlayerMP) player;
-                mp.interactionManager.onBlockClicked(blockResult.getBlockPos(), blockResult.sideHit);
-            }
+            return;
         }
     }
 

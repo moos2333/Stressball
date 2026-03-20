@@ -6,6 +6,7 @@ import baubles.api.IBauble;
 import baubles.api.cap.IBaublesItemHandler;
 import com.npstra.stressball.StressBall;
 import com.npstra.stressball.config.ConfigHandler;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.creativetab.CreativeTabs;
@@ -13,15 +14,11 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.item.EnumRarity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.EnumActionResult;
-import net.minecraft.util.EnumHand;
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.*;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
@@ -54,6 +51,7 @@ public class PressureBallItem extends Item implements IBauble {
     private static final Map<UUID, Integer> LAST_ATTACK_TIME = new WeakHashMap<>();
     private static final Map<UUID, BlockPos> LAST_POSITION = new WeakHashMap<>();
     private static final Map<UUID, Integer> MOVEMENT_TIMER = new WeakHashMap<>();
+    private static final Map<UUID, MiningProgress> MINING_PROGRESS = new WeakHashMap<>();
 
     public PressureBallItem() {
         setMaxStackSize(1);
@@ -145,7 +143,13 @@ public class PressureBallItem extends Item implements IBauble {
         ItemStack mainhand = player.getHeldItemMainhand();
         if (mainhand.isEmpty()) return;
 
-        mainhand.getItem().onItemRightClick(player.world, player, EnumHand.MAIN_HAND);
+        if (player.isCreative()) {
+            ItemStack copy = mainhand.copy();
+            mainhand.getItem().onItemRightClick(player.world, player, EnumHand.MAIN_HAND);
+            player.setHeldItem(EnumHand.MAIN_HAND, copy);
+        } else {
+            mainhand.getItem().onItemRightClick(player.world, player, EnumHand.MAIN_HAND);
+        }
     }
 
     private void performAutoAttack(EntityPlayer player) {
@@ -181,10 +185,34 @@ public class PressureBallItem extends Item implements IBauble {
 
         RayTraceResult blockResult = player.world.rayTraceBlocks(eyePos, endPos, false, true, true);
         if (blockResult != null && blockResult.typeOfHit == RayTraceResult.Type.BLOCK) {
-            if (player instanceof EntityPlayerMP) {
-                EntityPlayerMP mp = (EntityPlayerMP) player;
-                mp.interactionManager.onBlockClicked(blockResult.getBlockPos(), blockResult.sideHit);
+            if (player.isCreative()) return;
+            ItemStack mainhand = player.getHeldItemMainhand();
+            if (mainhand.isEmpty()) return;
+            String regName = mainhand.getItem().getRegistryName().toString();
+            if (!ConfigHandler.isAutoMineItem(regName)) return;
+
+            BlockPos pos = blockResult.getBlockPos();
+            IBlockState state = player.world.getBlockState(pos);
+            if (!mainhand.canHarvestBlock(state) && mainhand.getDestroySpeed(state) <= 1.0F) return;
+
+            UUID uuid = player.getUniqueID();
+            MiningProgress progress = MINING_PROGRESS.get(uuid);
+            if (progress == null || !progress.matches(pos, state, mainhand)) {
+                progress = new MiningProgress(pos, state, mainhand);
+                MINING_PROGRESS.put(uuid, progress);
             }
+
+            int requiredTicks = progress.getRequiredTicks();
+            progress.addTicks(ATTACK_INTERVAL);
+
+            if (progress.getCurrentTicks() >= requiredTicks) {
+                if (player.world.destroyBlock(pos, true)) {
+                    mainhand.onBlockDestroyed(player.world, state, pos, player);
+                }
+                MINING_PROGRESS.remove(uuid);
+            }
+        } else {
+            MINING_PROGRESS.remove(player.getUniqueID());
         }
     }
 
@@ -216,6 +244,7 @@ public class PressureBallItem extends Item implements IBauble {
         LAST_ATTACK_TIME.remove(uuid);
         LAST_POSITION.remove(uuid);
         MOVEMENT_TIMER.remove(uuid);
+        MINING_PROGRESS.remove(uuid);
     }
 
     @Override
@@ -226,5 +255,46 @@ public class PressureBallItem extends Item implements IBauble {
     @Override
     public boolean hasEffect(ItemStack stack) {
         return true;
+    }
+
+    private static class MiningProgress {
+        private final BlockPos pos;
+        private final IBlockState state;
+        private final ItemStack tool;
+        private int currentTicks;
+        private final int requiredTicks;
+
+        public MiningProgress(BlockPos pos, IBlockState state, ItemStack tool) {
+            this.pos = pos;
+            this.state = state;
+            this.tool = tool.copy();
+            this.currentTicks = 0;
+            this.requiredTicks = calculateRequiredTicks(tool, state);
+        }
+
+        private int calculateRequiredTicks(ItemStack tool, IBlockState state) {
+            float hardness = state.getBlockHardness(null, null);
+            if (hardness < 0) return Integer.MAX_VALUE;
+            float speed = tool.getDestroySpeed(state);
+            if (speed <= 0) return Integer.MAX_VALUE;
+            int ticks = (int) Math.ceil((hardness / speed) * 20);
+            return Math.max(1, ticks);
+        }
+
+        public boolean matches(BlockPos pos, IBlockState state, ItemStack tool) {
+            return this.pos.equals(pos) && this.state == state && ItemStack.areItemStacksEqual(this.tool, tool);
+        }
+
+        public void addTicks(int ticks) {
+            currentTicks += ticks;
+        }
+
+        public int getCurrentTicks() {
+            return currentTicks;
+        }
+
+        public int getRequiredTicks() {
+            return requiredTicks;
+        }
     }
 }

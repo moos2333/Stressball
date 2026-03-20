@@ -21,6 +21,7 @@ public class ConfigHandler {
     private static Set<String> itemBlacklist = new HashSet<>();
     private static Set<String> entityBlacklist = new HashSet<>();
     private static Set<String> rightClickItems = new HashSet<>();
+    private static Set<String> autoMineItems = new HashSet<>();
 
     public static void load(File configDir) {
         File configFile = new File(configDir, "stressball.json");
@@ -38,6 +39,9 @@ public class ConfigHandler {
                 }
                 if (data.rightClickItems != null) {
                     rightClickItems = new HashSet<>(Arrays.asList(data.rightClickItems));
+                }
+                if (data.autoMineItems != null) {
+                    autoMineItems = new HashSet<>(Arrays.asList(data.autoMineItems));
                 }
             }
         } catch (IOException e) {
@@ -61,6 +65,11 @@ public class ConfigHandler {
                 "tconevo:tool_sceptre",
                 "plustic:laser_gun"
         };
+        defaultData.autoMineItems = new String[]{
+                "minecraft:diamond_pickaxe",
+                "minecraft:diamond_axe",
+                "minecraft:diamond_shovel"
+        };
         try (FileWriter writer = new FileWriter(configFile)) {
             GSON.toJson(defaultData, writer);
         } catch (IOException e) {
@@ -80,9 +89,14 @@ public class ConfigHandler {
         return rightClickItems.contains(registryName);
     }
 
+    public static boolean isAutoMineItem(String registryName) {
+        return autoMineItems.contains(registryName);
+    }
+
     private static class ConfigData {
         String[] itemBlacklist;
         String[] entityBlacklist;
         String[] rightClickItems;
+        String[] autoMineItems;
     }
 }
