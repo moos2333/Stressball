@@ -13,6 +13,7 @@ import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.IEntityOwnable;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.item.EnumRarity;
@@ -178,6 +179,12 @@ public class PressureBallItem extends Item implements IBauble {
         if (targetEntity != null) {
             ResourceLocation entityId = EntityList.getKey(targetEntity.getClass());
             if (entityId != null && ConfigHandler.isEntityBlacklisted(entityId.toString())) return;
+
+            if (targetEntity instanceof IEntityOwnable) {
+                IEntityOwnable ownable = (IEntityOwnable) targetEntity;
+                Entity owner = ownable.getOwner();
+                if (owner instanceof EntityPlayer && owner.getUniqueID().equals(player.getUniqueID())) return;
+            }
 
             player.attackTargetEntityWithCurrentItem(targetEntity);
             return;
