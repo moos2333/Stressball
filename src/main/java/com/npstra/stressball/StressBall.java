@@ -25,9 +25,9 @@ import java.util.UUID;
 
 @Mod(modid = StressBall.MODID, name = StressBall.NAME, version = StressBall.VERSION, dependencies = "required-after:baubles")
 public class StressBall {
-    public static final String MODID = "stressball";
-    public static final String NAME = "Stress Ball";
-    public static final String VERSION = "0.0.4";
+    public static final String MODID = Tags.MOD_ID;
+    public static final String NAME = Tags.MOD_NAME;
+    public static final String VERSION = Tags.VERSION;
 
     public static SimpleNetworkWrapper NETWORK;
     public static final Map<UUID, Integer> LAST_ATTACK_TICK = new HashMap<>();

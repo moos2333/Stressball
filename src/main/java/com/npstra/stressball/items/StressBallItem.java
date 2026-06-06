@@ -12,6 +12,14 @@ import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.item.EntityArmorStand;
+import net.minecraft.entity.item.EntityBoat;
+import net.minecraft.entity.item.EntityItemFrame;
+import net.minecraft.entity.item.EntityPainting;
+import net.minecraft.entity.passive.EntityHorse;
+import net.minecraft.entity.passive.EntityOcelot;
+import net.minecraft.entity.passive.EntityTameable;
+import net.minecraft.entity.passive.EntityWolf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.item.EnumRarity;
@@ -135,10 +143,16 @@ public class StressBallItem extends Item implements IBauble {
     }
 
     private void performAutoAttack(EntityPlayer player) {
+        Entity target = findTarget(player);
+        if (target != null) {
+            player.attackTargetEntityWithCurrentItem(target);
+        }
+    }
+
+    private Entity findTarget(EntityPlayer player) {
         Vec3d eyePos = player.getPositionEyes(1.0F);
         Vec3d lookVec = player.getLook(1.0F);
         Vec3d endPos = eyePos.add(lookVec.scale(ATTACK_RANGE));
-
         AxisAlignedBB searchBox = player.getEntityBoundingBox().grow(ATTACK_RANGE);
         List<Entity> entities = player.world.getEntitiesWithinAABBExcludingEntity(player, searchBox);
         Entity targetEntity = null;
@@ -146,6 +160,15 @@ public class StressBallItem extends Item implements IBauble {
 
         for (Entity entity : entities) {
             if (!entity.canBeCollidedWith() && !entity.canBeAttackedWithItem()) continue;
+            if (entity instanceof EntityBoat) continue;
+            if (entity instanceof EntityItemFrame) continue;
+            if (entity instanceof EntityPainting) continue;
+            if (entity instanceof EntityArmorStand) continue;
+            if (entity instanceof EntityTameable && ((EntityTameable) entity).isTamed()) continue;
+            if (entity instanceof EntityWolf && ((EntityWolf) entity).isTamed()) continue;
+            if (entity instanceof EntityOcelot && ((EntityOcelot) entity).isTamed()) continue;
+            if (entity instanceof EntityHorse && ((EntityHorse) entity).isTame()) continue;
+
             AxisAlignedBB entityBB = entity.getEntityBoundingBox().grow(0.3);
             RayTraceResult result = entityBB.calculateIntercept(eyePos, endPos);
             if (result != null) {
@@ -156,16 +179,7 @@ public class StressBallItem extends Item implements IBauble {
                 }
             }
         }
-
-        if (targetEntity != null) {
-            player.attackTargetEntityWithCurrentItem(targetEntity);
-            return;
-        }
-
-        RayTraceResult blockResult = player.world.rayTraceBlocks(eyePos, endPos, false, true, true);
-        if (blockResult != null && blockResult.typeOfHit == RayTraceResult.Type.BLOCK) {
-            return;
-        }
+        return targetEntity;
     }
 
     @Override
