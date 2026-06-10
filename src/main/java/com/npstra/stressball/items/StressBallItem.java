@@ -173,6 +173,8 @@ public class StressBallItem extends Item implements IBauble {
             RayTraceResult result = entityBB.calculateIntercept(eyePos, endPos);
             if (result != null) {
                 double dist = eyePos.distanceTo(result.hitVec);
+                RayTraceResult blockHit = player.world.rayTraceBlocks(eyePos, result.hitVec, false, true, false);
+                if (blockHit != null && blockHit.typeOfHit == RayTraceResult.Type.BLOCK) continue;
                 if (dist < closest) {
                     closest = dist;
                     targetEntity = entity;
