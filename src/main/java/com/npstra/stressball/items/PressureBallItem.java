@@ -5,8 +5,6 @@ import baubles.api.BaublesApi;
 import baubles.api.IBauble;
 import baubles.api.cap.IBaublesItemHandler;
 import com.npstra.stressball.StressBall;
-import com.npstra.stressball.capability.GuiStateCapability;
-import com.npstra.stressball.capability.IGuiState;
 import com.npstra.stressball.config.ConfigHandler;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.resources.I18n;
@@ -100,6 +98,20 @@ public class PressureBallItem extends Item implements IBauble {
         EntityPlayer entityPlayer = (EntityPlayer) player;
         UUID uuid = entityPlayer.getUniqueID();
 
+        if (entityPlayer.isSpectator() || entityPlayer.isPlayerSleeping()) {
+            MINING_PROGRESS.remove(uuid);
+            return;
+        }
+
+        ItemStack mainhand = entityPlayer.getHeldItemMainhand();
+        ResourceLocation id = mainhand.isEmpty() ? null : mainhand.getItem().getRegistryName();
+        String regName = id == null ? "" : id.toString();
+
+        if (!mainhand.isEmpty() && id != null && ConfigHandler.isItemBlacklisted(regName)) {
+            MINING_PROGRESS.remove(uuid);
+            return;
+        }
+
         Vec3d currentPos = entityPlayer.getPositionVector();
         Vec3d lastPos = LAST_POSITION.get(uuid);
         boolean moved = false;
@@ -113,10 +125,7 @@ public class PressureBallItem extends Item implements IBauble {
         }
         LAST_POSITION.put(uuid, currentPos);
 
-        IGuiState guiState = GuiStateCapability.get(entityPlayer);
-        boolean guiOpen = guiState != null && guiState.isGuiOpen();
-
-        if (moved || guiOpen) {
+        if (moved) {
             MOVEMENT_TIMER.put(uuid, MOVEMENT_COOLDOWN);
             MINING_PROGRESS.remove(uuid);
             return;
@@ -133,21 +142,18 @@ public class PressureBallItem extends Item implements IBauble {
             }
         }
 
-        if (!shouldAttack(entityPlayer)) {
-            MINING_PROGRESS.remove(uuid);
-            return;
-        }
-
-        ItemStack mainhand = entityPlayer.getHeldItemMainhand();
-        ResourceLocation id = mainhand.isEmpty() ? null : mainhand.getItem().getRegistryName();
-        String regName = id == null ? "" : id.toString();
-
         if (!mainhand.isEmpty() && ConfigHandler.isRightClickItem(regName)) {
             int lastTick = LAST_RIGHT_CLICK_TIME.getOrDefault(uuid, 0);
-            if (entityPlayer.ticksExisted - lastTick >= RIGHT_CLICK_INTERVAL) {
+            if (entityPlayer.ticksExisted - lastTick >= RIGHT_CLICK_INTERVAL
+                    && !entityPlayer.getCooldownTracker().hasCooldown(mainhand.getItem())) {
                 processRightClickAttack(entityPlayer);
                 LAST_RIGHT_CLICK_TIME.put(uuid, entityPlayer.ticksExisted);
             }
+            return;
+        }
+
+        if (entityPlayer.isHandActive() || !entityPlayer.onGround) {
+            MINING_PROGRESS.remove(uuid);
             return;
         }
 
@@ -167,22 +173,6 @@ public class PressureBallItem extends Item implements IBauble {
             return;
         }
         tryMine(entityPlayer, eyePos, endPos, blockResult);
-    }
-
-    private boolean shouldAttack(EntityPlayer player) {
-        if (player.isSpectator()) return false;
-
-        ItemStack mainhand = player.getHeldItemMainhand();
-        if (!mainhand.isEmpty()) {
-            ResourceLocation id = mainhand.getItem().getRegistryName();
-            if (id != null && ConfigHandler.isItemBlacklisted(id.toString())) return false;
-        }
-
-        if (player.moveForward != 0 || player.moveStrafing != 0) return false;
-        if (!player.onGround) return false;
-        if (player.isHandActive()) return false;
-        if (player.isPlayerSleeping()) return false;
-        return true;
     }
 
     private void processRightClickAttack(EntityPlayer player) {
