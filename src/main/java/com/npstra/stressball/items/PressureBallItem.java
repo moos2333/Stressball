@@ -142,6 +142,11 @@ public class PressureBallItem extends Item implements IBauble {
             }
         }
 
+        if (entityPlayer.isHandActive()) {
+            MINING_PROGRESS.remove(uuid);
+            return;
+        }
+
         if (!mainhand.isEmpty() && ConfigHandler.isRightClickItem(regName)) {
             int lastTick = LAST_RIGHT_CLICK_TIME.getOrDefault(uuid, 0);
             if (entityPlayer.ticksExisted - lastTick >= RIGHT_CLICK_INTERVAL
@@ -152,7 +157,7 @@ public class PressureBallItem extends Item implements IBauble {
             return;
         }
 
-        if (entityPlayer.isHandActive() || !entityPlayer.onGround) {
+        if (!entityPlayer.onGround) {
             MINING_PROGRESS.remove(uuid);
             return;
         }
@@ -180,11 +185,15 @@ public class PressureBallItem extends Item implements IBauble {
         if (mainhand.isEmpty()) return;
 
         if (player.isCreative()) {
-            ItemStack copy = mainhand.copy();
+            int count = mainhand.getCount();
             mainhand.getItem().onItemRightClick(player.world, player, EnumHand.MAIN_HAND);
-            player.setHeldItem(EnumHand.MAIN_HAND, copy);
+            mainhand.setCount(count);
         } else {
-            mainhand.getItem().onItemRightClick(player.world, player, EnumHand.MAIN_HAND);
+            ActionResult<ItemStack> result = mainhand.getItem().onItemRightClick(player.world, player, EnumHand.MAIN_HAND);
+            ItemStack returned = result.getResult();
+            if (returned != mainhand) {
+                player.setHeldItem(EnumHand.MAIN_HAND, returned);
+            }
         }
     }
 
