@@ -7,7 +7,6 @@ import baubles.api.cap.IBaublesItemHandler;
 import com.npstra.stressball.StressBall;
 import com.npstra.stressball.capability.GuiStateCapability;
 import com.npstra.stressball.capability.IGuiState;
-import com.npstra.stressball.config.ConfigHandler;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.Entity;
@@ -21,10 +20,12 @@ import net.minecraft.entity.passive.EntityOcelot;
 import net.minecraft.entity.passive.EntityTameable;
 import net.minecraft.entity.passive.EntityWolf;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.item.EnumRarity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.play.server.SPacketAnimation;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumHand;
@@ -46,7 +47,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.WeakHashMap;
 
-@Mod.EventBusSubscriber
+@Mod.EventBusSubscriber(modid = StressBall.MODID)
 public class StressBallItem extends Item implements IBauble {
     @GameRegistry.ObjectHolder(StressBall.MODID + ":stressball")
     public static final StressBallItem STRESS_BALL = null;
@@ -118,23 +119,19 @@ public class StressBallItem extends Item implements IBauble {
             return;
         }
 
-        if (shouldAttack(entityPlayer) && entityPlayer.getCooledAttackStrength(0.5F) >= 1.0F) {
-            int lastTick = StressBall.LAST_ATTACK_TICK.getOrDefault(uuid, 0);
-            int currentTick = entityPlayer.ticksExisted;
-            if (currentTick - lastTick >= 10) {
-                performAutoAttack(entityPlayer);
-                StressBall.LAST_ATTACK_TICK.put(uuid, currentTick);
-            }
-        }
+        if (!shouldAttack(entityPlayer)) return;
+        if (entityPlayer.getCooledAttackStrength(0.5F) < 1.0F) return;
+
+        Entity target = findTarget(entityPlayer);
+        if (target == null) return;
+        if (target.hurtResistantTime > 0) return;
+
+        entityPlayer.attackTargetEntityWithCurrentItem(target);
+        swingArm(entityPlayer);
     }
 
     private boolean shouldAttack(EntityPlayer player) {
-        ItemStack mainhand = player.getHeldItemMainhand();
-        if (!mainhand.isEmpty()) {
-            String regName = mainhand.getItem().getRegistryName().toString();
-            if (ConfigHandler.isItemBlacklisted(regName)) return false;
-        }
-
+        if (player.isSpectator()) return false;
         if (player.moveForward != 0 || player.moveStrafing != 0) return false;
         if (!player.onGround) return false;
         if (player.isHandActive()) return false;
@@ -142,21 +139,22 @@ public class StressBallItem extends Item implements IBauble {
         return true;
     }
 
-    private void performAutoAttack(EntityPlayer player) {
-        Entity target = findTarget(player);
-        if (target != null) {
-            player.attackTargetEntityWithCurrentItem(target);
-        }
-    }
-
     private Entity findTarget(EntityPlayer player) {
         Vec3d eyePos = player.getPositionEyes(1.0F);
         Vec3d lookVec = player.getLook(1.0F);
         Vec3d endPos = eyePos.add(lookVec.scale(ATTACK_RANGE));
-        AxisAlignedBB searchBox = player.getEntityBoundingBox().grow(ATTACK_RANGE);
+
+        RayTraceResult blockHit = player.world.rayTraceBlocks(eyePos, endPos, false, true, false);
+        double blockDist = blockHit != null && blockHit.typeOfHit == RayTraceResult.Type.BLOCK
+                ? eyePos.distanceTo(blockHit.hitVec) : ATTACK_RANGE;
+
+        AxisAlignedBB searchBox = player.getEntityBoundingBox()
+                .expand(lookVec.x * ATTACK_RANGE, lookVec.y * ATTACK_RANGE, lookVec.z * ATTACK_RANGE)
+                .grow(1.0);
+
         List<Entity> entities = player.world.getEntitiesWithinAABBExcludingEntity(player, searchBox);
         Entity targetEntity = null;
-        double closest = Double.MAX_VALUE;
+        double closest = blockDist;
 
         for (Entity entity : entities) {
             if (!entity.canBeCollidedWith() && !entity.canBeAttackedWithItem()) continue;
@@ -169,12 +167,10 @@ public class StressBallItem extends Item implements IBauble {
             if (entity instanceof EntityOcelot && ((EntityOcelot) entity).isTamed()) continue;
             if (entity instanceof EntityHorse && ((EntityHorse) entity).isTame()) continue;
 
-            AxisAlignedBB entityBB = entity.getEntityBoundingBox().grow(0.3);
+            AxisAlignedBB entityBB = entity.getEntityBoundingBox().grow(entity.getCollisionBorderSize());
             RayTraceResult result = entityBB.calculateIntercept(eyePos, endPos);
             if (result != null) {
                 double dist = eyePos.distanceTo(result.hitVec);
-                RayTraceResult blockHit = player.world.rayTraceBlocks(eyePos, result.hitVec, false, true, false);
-                if (blockHit != null && blockHit.typeOfHit == RayTraceResult.Type.BLOCK) continue;
                 if (dist < closest) {
                     closest = dist;
                     targetEntity = entity;
@@ -182,6 +178,14 @@ public class StressBallItem extends Item implements IBauble {
             }
         }
         return targetEntity;
+    }
+
+    static void swingArm(EntityPlayer player) {
+        if (player.world.isRemote) return;
+        player.swingArm(EnumHand.MAIN_HAND);
+        if (player instanceof EntityPlayerMP) {
+            ((EntityPlayerMP) player).connection.sendPacket(new SPacketAnimation(player, 0));
+        }
     }
 
     @Override
