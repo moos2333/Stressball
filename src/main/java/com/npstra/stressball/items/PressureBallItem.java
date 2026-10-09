@@ -105,9 +105,8 @@ public class PressureBallItem extends Item implements IBauble {
 
         ItemStack mainhand = entityPlayer.getHeldItemMainhand();
         ResourceLocation id = mainhand.isEmpty() ? null : mainhand.getItem().getRegistryName();
-        String regName = id == null ? "" : id.toString();
 
-        if (!mainhand.isEmpty() && id != null && ConfigHandler.isItemBlacklisted(regName)) {
+        if (ConfigHandler.isItemBlacklisted(id)) {
             MINING_PROGRESS.remove(uuid);
             return;
         }
@@ -147,11 +146,11 @@ public class PressureBallItem extends Item implements IBauble {
             return;
         }
 
-        if (!mainhand.isEmpty() && ConfigHandler.isRightClickItem(regName)) {
+        if (ConfigHandler.isRightClickItem(id)) {
             int lastTick = LAST_RIGHT_CLICK_TIME.getOrDefault(uuid, 0);
             if (entityPlayer.ticksExisted - lastTick >= RIGHT_CLICK_INTERVAL
                     && !entityPlayer.getCooldownTracker().hasCooldown(mainhand.getItem())) {
-                processRightClickAttack(entityPlayer);
+                processRightClickAttack(entityPlayer, mainhand);
                 LAST_RIGHT_CLICK_TIME.put(uuid, entityPlayer.ticksExisted);
             }
             return;
@@ -163,7 +162,7 @@ public class PressureBallItem extends Item implements IBauble {
         }
 
         boolean canAttack = entityPlayer.getCooledAttackStrength(0.5F) >= 1.0F;
-        boolean canMine = !mainhand.isEmpty() && id != null && ConfigHandler.isAutoMineItem(regName);
+        boolean canMine = ConfigHandler.isAutoMineItem(id);
         if (!canAttack && !canMine) {
             MINING_PROGRESS.remove(uuid);
             return;
@@ -174,16 +173,15 @@ public class PressureBallItem extends Item implements IBauble {
         Vec3d endPos = eyePos.add(lookVec.scale(ATTACK_RANGE));
         RayTraceResult blockResult = entityPlayer.world.rayTraceBlocks(eyePos, endPos, false, true, false);
 
-        if (canAttack && performAutoAttack(entityPlayer, eyePos, lookVec, endPos, blockResult)) {
+        if (canAttack && performAutoAttack(entityPlayer, uuid, eyePos, lookVec, endPos, blockResult)) {
             return;
         }
-        tryMine(entityPlayer, eyePos, endPos, blockResult);
+        if (canMine) {
+            tryMine(entityPlayer, uuid, mainhand, blockResult);
+        }
     }
 
-    private void processRightClickAttack(EntityPlayer player) {
-        ItemStack mainhand = player.getHeldItemMainhand();
-        if (mainhand.isEmpty()) return;
-
+    private void processRightClickAttack(EntityPlayer player, ItemStack mainhand) {
         if (player.isCreative()) {
             int count = mainhand.getCount();
             mainhand.getItem().onItemRightClick(player.world, player, EnumHand.MAIN_HAND);
@@ -197,7 +195,7 @@ public class PressureBallItem extends Item implements IBauble {
         }
     }
 
-    private boolean performAutoAttack(EntityPlayer player, Vec3d eyePos, Vec3d lookVec, Vec3d endPos, RayTraceResult blockResult) {
+    private boolean performAutoAttack(EntityPlayer player, UUID uuid, Vec3d eyePos, Vec3d lookVec, Vec3d endPos, RayTraceResult blockResult) {
         double blockDist = blockResult != null && blockResult.typeOfHit == RayTraceResult.Type.BLOCK
                 ? eyePos.distanceTo(blockResult.hitVec) : ATTACK_RANGE;
 
@@ -214,12 +212,12 @@ public class PressureBallItem extends Item implements IBauble {
             if (isExcluded(entity)) continue;
 
             ResourceLocation entityId = EntityList.getKey(entity.getClass());
-            if (entityId != null && ConfigHandler.isEntityBlacklisted(entityId.toString())) continue;
+            if (ConfigHandler.isEntityBlacklisted(entityId)) continue;
 
             if (entity instanceof IEntityOwnable) {
                 IEntityOwnable ownable = (IEntityOwnable) entity;
                 Entity owner = ownable.getOwner();
-                if (owner instanceof EntityPlayer && owner.getUniqueID().equals(player.getUniqueID())) continue;
+                if (owner instanceof EntityPlayer && owner.getUniqueID().equals(uuid)) continue;
             }
 
             AxisAlignedBB entityBB = entity.getEntityBoundingBox().grow(entity.getCollisionBorderSize());
@@ -234,33 +232,29 @@ public class PressureBallItem extends Item implements IBauble {
         }
 
         if (targetEntity == null) return false;
-        if (targetEntity.hurtResistantTime > 0) return true;
+        if (targetEntity instanceof EntityLivingBase) {
+            EntityLivingBase living = (EntityLivingBase) targetEntity;
+            if (living.hurtResistantTime > living.maxHurtResistantTime / 2) return true;
+        }
 
         player.attackTargetEntityWithCurrentItem(targetEntity);
         StressBallItem.swingArm(player);
-        MINING_PROGRESS.remove(player.getUniqueID());
+        MINING_PROGRESS.remove(uuid);
         return true;
     }
 
-    private void tryMine(EntityPlayer player, Vec3d eyePos, Vec3d endPos, RayTraceResult blockResult) {
+    private void tryMine(EntityPlayer player, UUID uuid, ItemStack mainhand, RayTraceResult blockResult) {
         if (blockResult == null || blockResult.typeOfHit != RayTraceResult.Type.BLOCK) {
-            MINING_PROGRESS.remove(player.getUniqueID());
+            MINING_PROGRESS.remove(uuid);
             return;
         }
 
         if (player.isCreative()) return;
 
-        ItemStack mainhand = player.getHeldItemMainhand();
-        if (mainhand.isEmpty()) return;
-        ResourceLocation id = mainhand.getItem().getRegistryName();
-        if (id == null) return;
-        if (!ConfigHandler.isAutoMineItem(id.toString())) return;
-
         BlockPos pos = blockResult.getBlockPos();
         IBlockState state = player.world.getBlockState(pos);
         if (!mainhand.canHarvestBlock(state) && mainhand.getDestroySpeed(state) <= 1.0F) return;
 
-        UUID uuid = player.getUniqueID();
         MiningProgress progress = MINING_PROGRESS.get(uuid);
         if (progress == null || !progress.matches(player.world, pos, state, mainhand)) {
             progress = new MiningProgress(player.world, pos, state, mainhand);

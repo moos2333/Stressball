@@ -124,7 +124,10 @@ public class StressBallItem extends Item implements IBauble {
 
         Entity target = findTarget(entityPlayer);
         if (target == null) return;
-        if (target.hurtResistantTime > 0) return;
+        if (target instanceof EntityLivingBase) {
+            EntityLivingBase living = (EntityLivingBase) target;
+            if (living.hurtResistantTime > living.maxHurtResistantTime / 2) return;
+        }
 
         entityPlayer.attackTargetEntityWithCurrentItem(target);
         swingArm(entityPlayer);

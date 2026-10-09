@@ -3,6 +3,7 @@ package com.npstra.stressball.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.npstra.stressball.StressBall;
+import net.minecraft.util.ResourceLocation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -77,20 +78,24 @@ public class ConfigHandler {
         }
     }
 
-    public static boolean isItemBlacklisted(String registryName) {
-        return itemBlacklist.contains(registryName);
+    public static boolean isItemBlacklisted(ResourceLocation id) {
+        if (id == null || itemBlacklist.isEmpty()) return false;
+        return itemBlacklist.contains(id.toString());
     }
 
-    public static boolean isEntityBlacklisted(String registryName) {
-        return entityBlacklist.contains(registryName);
+    public static boolean isEntityBlacklisted(ResourceLocation id) {
+        if (id == null || entityBlacklist.isEmpty()) return false;
+        return entityBlacklist.contains(id.toString());
     }
 
-    public static boolean isRightClickItem(String registryName) {
-        return rightClickItems.contains(registryName);
+    public static boolean isRightClickItem(ResourceLocation id) {
+        if (id == null || rightClickItems.isEmpty()) return false;
+        return rightClickItems.contains(id.toString());
     }
 
-    public static boolean isAutoMineItem(String registryName) {
-        return autoMineItems.contains(registryName);
+    public static boolean isAutoMineItem(ResourceLocation id) {
+        if (id == null || autoMineItems.isEmpty()) return false;
+        return autoMineItems.contains(id.toString());
     }
 
     private static class ConfigData {
