@@ -1,0 +1,6 @@
+{
+  "item.stressball.stressball": "Stress Ball",
+  "item.stressball.pressure_ball": "Pressure Ball",
+  "item.stressball.stressball.desc": "Automatically attacks when standing still\\nCannot attack while inventory is open",
+  "item.stressball.pressure_ball.desc": "Automatically attacks when standing still\\nCertain items are used with right-click"
+}

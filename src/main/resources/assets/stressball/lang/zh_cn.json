@@ -1,0 +1,6 @@
+{
+  "item.stressball.stressball": "解压球",
+  "item.stressball.pressure_ball": "压力球",
+  "item.stressball.stressball.desc": "站立不动时自动攻击\\n物品栏打开时无效",
+  "item.stressball.pressure_ball.desc": "站立不动时自动攻击\\n特定物品将变为右键使用"
+}
